@@ -194,36 +194,6 @@ void event_polling_function(int w, int mb, FIFORequestChannel** wchans, BoundedB
         }
 
     }
-
-
-    // while (true){
-    //     request_buffer -> pop(buf, 1024);
-    //     MESSAGE_TYPE* m = (MESSAGE_TYPE*) buf;
-    //     if(*m == DATA_MSG){
-    //         chan -> cwrite(buf, sizeof(datamsg));
-    //         chan -> cread(&resp, sizeof(double));
-    //         hc -> update(((datamsg*) buf) -> person, resp);
-    //     } else if (*m == QUIT_MSG){
-    //         chan -> cwrite(m, sizeof(MESSAGE_TYPE));
-    //         delete chan;
-    //         break;
-    //     } else if (*m == FILE_MSG){
-    //         filemsg* fm = (filemsg*) buf;
-    //         string fname = (char*)(fm + 1);
-    //         int sz = sizeof (filemsg) + fname.size() + 1;
-    //         chan -> cwrite (buf, sz);
-    //         chan -> cread(recvbuf, mb);
-
-    //         string recvfname = "recv/" + fname;
-
-    //         FILE* fp = fopen(recvfname.c_str(), "r+");
-    //         fseek(fp, fm -> offset, SEEK_SET);
-    //         fwrite(recvbuf, 1, fm -> length, fp);
-    //         fclose(fp);
-
-
-    //     } 
-    // }
 }
 
 
@@ -234,7 +204,7 @@ int main(int argc, char *argv[])
     int n = 15000;    //default number of requests per "patient"
     int p = 1;     // number of patients [1,15]
     int w = 200;    //default number of worker threads
-    int b = 500; 	// default capacity of the request buffer, you should change this default
+    int b = 100; 	// default capacity of the request buffer, you should change this default
 	int m = MAX_MESSAGE; 	// default capacity of the message buffer
     char* mSize = "";
     srand(time_t(NULL));
@@ -299,10 +269,7 @@ int main(int argc, char *argv[])
     struct timeval start, end;
     gettimeofday (&start, 0);
     /* Start all threads here */
-	thread patient[p];
-    for (int i = 0; i < p; i++){
-        patient[i] = thread(patient_thread_function, n, i+1, &request_buffer);
-    }
+
 
     //PA4
     // thread patient[p];    
@@ -332,6 +299,15 @@ int main(int argc, char *argv[])
     if (fname != ""){
         thread filethread (file_thread_function, fname, &request_buffer, chan, m);
         filethread.join();
+    } else {
+    	thread patient[p];
+        for (int i = 0; i < p; i++){
+            patient[i] = thread(patient_thread_function, n, i+1, &request_buffer);
+        }
+
+        for (int i = 0; i < p; i++){
+            patient[i].join();
+        }    
     }
     // thread workers[w];
     // for (int i = 0; i < w; i++){
@@ -355,9 +331,9 @@ int main(int argc, char *argv[])
     //     workers[i].join();
     // }
 
-    for (int i = 0; i < p; i++){
-        patient[i].join();
-    }
+    // for (int i = 0; i < p; i++){
+    //     patient[i].join();
+    // }
 
     //push a single quit message
     MESSAGE_TYPE q = QUIT_MSG;
@@ -366,21 +342,12 @@ int main(int argc, char *argv[])
     //join epoll thread
     evp.join();
 
-    cout << "Worker threads finished" << endl;
-
     gettimeofday (&end, 0);
     // print the results
 	hc.print ();
     int secs = (end.tv_sec * 1e6 + end.tv_usec - start.tv_sec * 1e6 - start.tv_usec)/(int) 1e6;
     int usecs = (int)(end.tv_sec * 1e6 + end.tv_usec - start.tv_sec * 1e6 - start.tv_usec)%((int) 1e6);
     cout << "Took " << secs << " seconds and " << usecs << " micro seconds" << endl;
-
-    // //cleaning up worker channels
-    // for (int i = 0; i < p; i++){
-    //     MESSAGE_TYPE q = QUIT_MSG;
-    //     wchans[i]->cwrite ((char *) &q, sizeof (MESSAGE_TYPE));
-    //     delete wchans[i];        
-    // }
 
     //clean up wchans
     //delete each element and the array itself

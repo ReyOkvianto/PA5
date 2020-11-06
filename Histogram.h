@@ -13,7 +13,6 @@ private:
 	vector<int> hist;
 	int nbins;
 	double start, end;
-	mutex m;
 public:
     Histogram(int, double, double);
 	~Histogram();
